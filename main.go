@@ -14,7 +14,7 @@ import (
 
 var (
 	aliveMetric = promauto.NewGauge(prometheus.GaugeOpts{
-		Name: "systemd_socket_alive",
+		Name: "service_alive",
 		Help: "Indicates if 'alive' message was received on the systemd socket.",
 	})
 )
