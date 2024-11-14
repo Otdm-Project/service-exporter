@@ -49,7 +49,7 @@ func handleConnection(conn net.Conn) {
 }
 
 func main() {
-	listener, err := net.Listen("tcp", ":2000")
+	listener, err := net.Listen("tcp", "localhost:2000")
 	if err != nil {
 		fmt.Println("Error starting TCP server:", err)
 		return
