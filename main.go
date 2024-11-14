@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"sync"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -17,27 +18,22 @@ var (
 		Name: "service_alive",
 		Help: "Indicates if 'alive' message was received on the systemd socket.",
 	})
+	lastMessageTime int64
+	mu              sync.Mutex
 )
 
 func handleConnection(conn net.Conn) {
 	defer conn.Close()
-	currentTime := time.Now().Unix()
 	scanner := bufio.NewScanner(conn)
 
-	go func() {
-		for range time.Tick(10 * time.Second) {
-			if time.Now().Unix()-currentTime > 15 {
-				aliveMetric.Set(0)
-			} else {
-				aliveMetric.Set(1)
-			}
-		}
-	}()
-
 	for scanner.Scan() {
-		currentTime = time.Now().Unix()
+		// メッセージ受信時にlastMessageTimeを更新
+		mu.Lock()
+		lastMessageTime = time.Now().Unix()
+		mu.Unlock()
 	}
 
+	// 接続エラーが発生した場合のエラーログ出力
 	if err := scanner.Err(); err != nil {
 		fmt.Println("Error reading from connection:", err)
 	}
@@ -51,6 +47,21 @@ func main() {
 	go func() {
 		if err := http.ListenAndServe(":9200", nil); err != nil {
 			fmt.Println("Error starting HTTP server:", err)
+		}
+	}()
+
+	// メトリクスを定期的に更新するゴルーチンを開始
+	go func() {
+		for range time.Tick(10 * time.Second) {
+			mu.Lock()
+			if time.Now().Unix()-lastMessageTime > 15 {
+				aliveMetric.Set(0)
+				fmt.Println("Metric set to 0 (no message in last 15 seconds)")
+			} else {
+				aliveMetric.Set(1)
+				fmt.Println("Metric set to 1 (message received recently)")
+			}
+			mu.Unlock()
 		}
 	}()
 
