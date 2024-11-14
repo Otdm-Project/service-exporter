@@ -24,11 +24,6 @@ func handleConnection(conn net.Conn) {
 	currentTime := time.Now().Unix()
 	scanner := bufio.NewScanner(conn)
 
-	http.Handle("/metrics", promhttp.Handler())
-	go func() {
-		http.ListenAndServe(":9200", nil)
-	}()
-
 	go func() {
 		for range time.Tick(10 * time.Second) {
 			if time.Now().Unix()-currentTime > 15 {
@@ -49,6 +44,16 @@ func handleConnection(conn net.Conn) {
 }
 
 func main() {
+	// /metricsエンドポイントを1回だけ登録
+	http.Handle("/metrics", promhttp.Handler())
+
+	// HTTPサーバーをバックグラウンドで起動
+	go func() {
+		if err := http.ListenAndServe(":9200", nil); err != nil {
+			fmt.Println("Error starting HTTP server:", err)
+		}
+	}()
+
 	listener, err := net.Listen("tcp", "localhost:2000")
 	if err != nil {
 		fmt.Println("Error starting TCP server:", err)
